@@ -1,7 +1,6 @@
 #include <ESP8266WiFi.h>
 
 int program = 1;
-int curLooop = 0;
 int currStep = 0;
 
 bool ReverseActive = false;
@@ -9,7 +8,7 @@ int ReverseCount = 2;
 int ReverseCountCurr = 0;
 
 bool InvertActive = false;
-int InvertCount = 0;
+int InvertCount = 4;
 int InvertCountCurr = 0;
 
 unsigned long nextStep;
@@ -27,28 +26,13 @@ static const byte someData[][8] = {
 void setup() {
   Serial.begin(115200);
   nextStep = millis() + delaytime;
-
 }
 
-void loop(){
-  waitForNextStep();
-  printStep(someData[program][currStep]);
-
-}
-
-void waitForNextStep()
-{
-//  do {
-//   delay(10);
-//  } while (millis() >= nextStep);
-//  nextStep = millis() + delaytime ;
-  delay(500);
+void Step(){
   currStep++;
   if (currStep == 8 ) 
   {
     currStep = 0;
-    curLooop++;
-
     if (ReverseCount > 0){
       ReverseCountCurr++;
       if (ReverseCountCurr == ReverseCount)
@@ -57,10 +41,14 @@ void waitForNextStep()
         ReverseActive = !ReverseActive;
       }
     }
-
-
-    
-    if (curLooop==10) curLooop = 1;
+    if (InvertCount > 0){
+      InvertCountCurr++;
+      if (InvertCountCurr == InvertCount)
+      {
+        InvertCountCurr = 0;
+        InvertActive = !InvertActive;
+      }
+    }
   }
   return;
 }
@@ -75,7 +63,6 @@ void printStep(byte b){
     {
       if (InvertActive) Serial.print ("_");
       if (!InvertActive) Serial.print ("X");
-      Serial.print ("X");
     } else {
       if (InvertActive) Serial.print ("X");
       if (!InvertActive) Serial.print ("_");
@@ -89,4 +76,10 @@ void printBinary(byte b) {
     Serial.print((b >> i) & 0X01);//shift and select first bit
   }
   Serial.println();
+}
+
+void loop(){
+  Step();
+  printStep(someData[program][currStep]);
+  delay(500);
 }
