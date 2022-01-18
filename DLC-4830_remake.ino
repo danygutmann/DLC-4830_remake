@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <Adafruit_NeoPixel.h>
 #include "data.h"
@@ -55,6 +56,21 @@ void setup() {
   server.on("/", handleRoot);
   server.onNotFound(HandleHttpData);
   server.begin();
+}
+
+String GerJsonResponse() {
+  String result;
+  StaticJsonDocument<200> doc;
+  doc["dir"]["state"] = ReverseActive;
+  doc["dir"]["auto"] = ReverseCount;
+  doc["inv"]["state"] = InvertActive;
+  doc["inv"]["auto"] = InvertCount;
+  doc["prog"]["actual"] = program;
+  doc["prog"]["auto"] = AutoProgCount;
+  doc["Speed"] = currSpeed;
+  
+  serializeJson(doc, result);
+  return result;
 }
 
 byte GetNextStep(){
@@ -174,11 +190,11 @@ void InvertAutoSteps(int steps){
 void loop(){
   server.handleClient();
   printByte(GetNextStep());
-  delay(50*currSpeed);
+  delay(25*currSpeed);
 }
 
 void handleRoot() {
-  server.send(200, "text/html", "Hallo vom DLC-4830");
+  server.send(200, "application/json", GerJsonResponse());
   }
 void HandleHttpData() {
   String erg = server.uri() + "<br>";
@@ -196,5 +212,5 @@ void HandleHttpData() {
   if (Cmd=="SpeedPlus") SpeedPlus();
   if (Cmd=="SpeedMinus") SpeedMinus();
   
-  server.send(200, "text/html", erg);
+  server.send(200, "application/json", GerJsonResponse());
   }
