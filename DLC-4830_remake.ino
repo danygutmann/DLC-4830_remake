@@ -4,11 +4,16 @@
 #include "data.h"
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
+#include <WiFiUdp.h>
 
 ESP8266WebServer server(80);
 ESP8266HTTPUpdateServer httpUpdater;
-
 Adafruit_NeoPixel pixels(8, 5, NEO_GRB + NEO_KHZ800);
+
+WiFiUDP Udp;
+IPAddress broadcastIP(255, 255, 255, 255);
+constexpr uint16_t PORT = 8266;
+char packetBuffer[255];   
 
 int program = 1;
 int currStep = 0;
@@ -29,6 +34,8 @@ int AutoProgCountCurr = 0;
 unsigned long nextStep;
 unsigned long delaytime = 1000;
 
+
+
 byte colorAssigment[][3] = {
 {255, 0, 0},
 {0, 255, 0},
@@ -40,22 +47,29 @@ byte colorAssigment[][3] = {
 {255, 0, 0},
 };
 
-
-
-
 void setup() {
   Serial.begin(115200);
   nextStep = millis() + delaytime;
   pixels.begin();
 
-  WiFi.softAP("DLC-4830", "");
-  IPAddress myIP = WiFi.softAPIP();
-  delay(500);
+  //WiFi.softAP("DLC-4830", "");
+  //IPAddress myIP = WiFi.softAPIP();
+  //delay(500);
+
+  WiFi.begin("K2-NET", "Dikt81mp!");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(200);
+    Serial.print(".");
+  }
+  Serial.println("Verbunden!");
+
 
   httpUpdater.setup(&server); 
   server.on("/", handleRoot);
   server.onNotFound(HandleHttpData);
   server.begin();
+
+  
 }
 
 String GerJsonResponse() {
@@ -72,7 +86,6 @@ String GerJsonResponse() {
   serializeJson(doc, result);
   return result;
 }
-
 byte GetNextStep(){
   currStep++;
   if (currStep == 8 ) 
@@ -103,12 +116,17 @@ byte GetNextStep(){
         if (program == 51) program = 1;
       }
     }
-
-    
   }
   byte b = someData[program][currStep];
   if (ReverseActive) b = flipByte(b);
   if (InvertActive) b = ~b;
+
+  Udp.begin(PORT);
+  Udp.beginPacket(broadcastIP, PORT);
+  Udp.print(b);
+  Udp.endPacket();
+
+  Serial.println(String(b));
   
   return b;
 }
@@ -125,17 +143,17 @@ void printByte(byte b){
 //  }
 //  Serial.println();
 
-  pixels.clear();
-  for (int i = 7; i >= 0; i-- )
-  {
-    if (bitRead(b, i) == 1)
-    {
-      pixels.setPixelColor(i, pixels.Color(colorAssigment[i][0], colorAssigment[i][1], colorAssigment[i][2]));
-    } else {
-      pixels.setPixelColor(i, pixels.Color(0, 0, 0));
-    }
-  }
-  pixels.show();
+//  pixels.clear();
+//  for (int i = 7; i >= 0; i-- )
+//  {
+//    if (bitRead(b, i) == 1)
+//    {
+//      pixels.setPixelColor(i, pixels.Color(colorAssigment[i][0], colorAssigment[i][1], colorAssigment[i][2]));
+//    } else {
+//      pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+//    }
+//  }
+//  pixels.show();
 }
 byte flipByte(byte c){
    c = ((c>>1)&0x55)|((c<<1)&0xAA);
@@ -144,6 +162,9 @@ byte flipByte(byte c){
    return c;
  }
 
+void SpeedSet(int speed){
+  currSpeed = speed;
+  }
 void SpeedPlus(){
   currSpeed++;
   }
