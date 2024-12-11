@@ -34,8 +34,6 @@ int AutoProgCountCurr = 0;
 unsigned long nextStep;
 unsigned long delaytime = 1000;
 
-
-
 byte colorAssigment[][3] = {
 {255, 0, 0},
 {0, 255, 0},
@@ -62,6 +60,7 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("Verbunden!");
+  Serial.println(WiFi.localIP());
 
 
   httpUpdater.setup(&server); 
@@ -132,28 +131,28 @@ byte GetNextStep(){
 }
 void printByte(byte b){ 
   
-//  for (int i = 7; i >= 0; i-- )
-//  {
-//    if (bitRead(b, i) == 1)
-//    {
-//      Serial.print ("█");
-//    } else {
-//      Serial.print ("░"); 
-//    }
-//  }
-//  Serial.println();
+ for (int i = 7; i >= 0; i-- )
+ {
+   if (bitRead(b, i) == 1)
+   {
+     Serial.print ("█");
+   } else {
+     Serial.print ("░"); 
+   }
+ }
+ Serial.println();
 
-//  pixels.clear();
-//  for (int i = 7; i >= 0; i-- )
-//  {
-//    if (bitRead(b, i) == 1)
-//    {
-//      pixels.setPixelColor(i, pixels.Color(colorAssigment[i][0], colorAssigment[i][1], colorAssigment[i][2]));
-//    } else {
-//      pixels.setPixelColor(i, pixels.Color(0, 0, 0));
-//    }
-//  }
-//  pixels.show();
+ pixels.clear();
+ for (int i = 7; i >= 0; i-- )
+ {
+   if (bitRead(b, i) == 1)
+   {
+     pixels.setPixelColor(i, pixels.Color(colorAssigment[i][0], colorAssigment[i][1], colorAssigment[i][2]));
+   } else {
+     pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+   }
+ }
+ pixels.show();
 }
 byte flipByte(byte c){
    c = ((c>>1)&0x55)|((c<<1)&0xAA);
@@ -164,6 +163,19 @@ byte flipByte(byte c){
 
 void SpeedSet(int speed){
   currSpeed = speed;
+
+  // Speed werte
+  // 0  0ms - stop
+  // 1   20 ms
+  // 2   40 ms
+  // 3   80 ms
+  // 4  120 ms
+  // 5  160 ms
+  // 6  200 ms
+  // 7  280 ms
+  // 8  380 ms
+  // 9  500 ms 
+  
   }
 void SpeedPlus(){
   currSpeed++;
@@ -211,7 +223,7 @@ void InvertAutoSteps(int steps){
 void loop(){
   server.handleClient();
   printByte(GetNextStep());
-  delay(25*currSpeed);
+  delay(200*currSpeed);
 }
 
 void handleRoot() {
