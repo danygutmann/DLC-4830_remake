@@ -18,18 +18,23 @@ char packetBuffer[255];
 int program = 1;
 int currStep = 0;
 int currSpeed = 1;
+int speedDelay = 20;
+unsigned long nextStepAt = millis() + 50; 
 byte currOut;
 
 bool ReverseActive = false;
+bool ReverseAutoActive = false;
+bool ReverseBounceActive = false;
 int ReverseCount = 0;
 int ReverseCountCurr = 0;
 
 bool InvertActive = false;
+bool InvertAutoActive = false;
 int InvertCount = 0;
 int InvertCountCurr = 0;
 
-int AutoProgCount = 0;
-int AutoProgCountCurr = 0;
+bool AutoProgActive = false;
+unsigned long AutoProgChange = millis();
 
 unsigned long nextStep;
 unsigned long delaytime = 1000;
@@ -79,18 +84,27 @@ String GerJsonResponse() {
   doc["inv"]["state"] = InvertActive;
   doc["inv"]["auto"] = InvertCount;
   doc["prog"]["actual"] = program;
-  doc["prog"]["auto"] = AutoProgCount;
   doc["Speed"] = currSpeed;
   
   serializeJson(doc, result);
   return result;
 }
+
 byte GetNextStep(){
   currStep++;
   if (currStep == 8 ) 
   {
+    if (AutoProgActive) {
+      if (millis() >= AutoProgChange) {
+        AutoProgChange = millis()+15000;
+        program++;
+        if (program == 101) program = 1;
+      }
+    }
+
     currStep = 0;
-    if (ReverseCount > 0){
+
+    if (ReverseAutoActive){
       ReverseCountCurr++;
       if (ReverseCountCurr == ReverseCount)
       {
@@ -98,7 +112,12 @@ byte GetNextStep(){
         ReverseActive = !ReverseActive;
       }
     }
-    if (InvertCount > 0){
+
+    if (ReverseBounceActive) {
+
+    }
+
+    if (InvertAutoActive){
       InvertCountCurr++;
       if (InvertCountCurr == InvertCount)
       {
@@ -106,24 +125,17 @@ byte GetNextStep(){
         InvertActive = !InvertActive;
       }
     }
-    if (AutoProgCount > 0){
-      AutoProgCountCurr++;
-      if (AutoProgCountCurr == AutoProgCount)
-      {
-        AutoProgCountCurr = 0;
-        program++;
-        if (program == 51) program = 1;
-      }
-    }
+
   }
+
   byte b = someData[program][currStep];
   if (ReverseActive) b = flipByte(b);
   if (InvertActive) b = ~b;
 
-  Udp.begin(PORT);
-  Udp.beginPacket(broadcastIP, PORT);
-  Udp.print(b);
-  Udp.endPacket();
+  //Udp.begin(PORT);
+  //Udp.beginPacket(broadcastIP, PORT);
+  //Udp.print(b);
+  //Udp.endPacket();
 
   Serial.println(String(b));
   
@@ -153,6 +165,12 @@ void printByte(byte b){
    }
  }
  pixels.show();
+
+  // next step
+ if (currSpeed > 0 ) {
+  nextStepAt =  millis() + speedDelay;
+ }
+
 }
 byte flipByte(byte c){
    c = ((c>>1)&0x55)|((c<<1)&0xAA);
@@ -163,25 +181,21 @@ byte flipByte(byte c){
 
 void SpeedSet(int speed){
   currSpeed = speed;
-
-  // Speed werte
-  // 0  0ms - stop
-  // 1   20 ms
-  // 2   40 ms
-  // 3   80 ms
-  // 4  120 ms
-  // 5  160 ms
-  // 6  200 ms
-  // 7  280 ms
-  // 8  380 ms
-  // 9  500 ms 
-  
+  if (currSpeed == 1 ) speedDelay = 20;
+  if (currSpeed == 2 ) speedDelay = 40;
+  if (currSpeed == 3 ) speedDelay = 80;
+  if (currSpeed == 4 ) speedDelay = 120;
+  if (currSpeed == 5 ) speedDelay = 160;
+  if (currSpeed == 6 ) speedDelay = 200;
+  if (currSpeed == 7 ) speedDelay = 280;
+  if (currSpeed == 8 ) speedDelay = 380;
+  if (currSpeed == 9 ) speedDelay = 500;
   }
 void SpeedPlus(){
-  currSpeed++;
+  SpeedSet(currSpeed +1);
   }
 void SpeedMinus(){
-  currSpeed--;
+  SpeedSet(currSpeed -1);
   }
   
 void ProgNext(){
@@ -189,6 +203,20 @@ void ProgNext(){
   }
 void ProgLast(){
   program--;
+  }
+void ProgAutoOn(){
+  AutoProgChange = millis()+15000;
+  AutoProgActive = true;
+  }
+void ProgAutoOff(){
+  AutoProgActive = false;
+  }
+void ProgAutoToggle() {
+    if (AutoProgActive == false) {
+      AutoProgActive = true;
+    }else{
+      AutoProgActive = false;
+    }
   }
 void ProgSet(int prog){
   program = prog;
@@ -201,7 +229,7 @@ void DirForward(){
   ReverseActive = false;;
   }
 void DirReverse(){
-  ReverseActive = false;;
+  ReverseActive = true;;
   }
 void DirAutoSteps(int steps){
   ReverseCount = steps;
@@ -220,30 +248,79 @@ void InvertAutoSteps(int steps){
   InvertCount = steps;
   }
   
+
+
 void loop(){
   server.handleClient();
-  printByte(GetNextStep());
-  delay(200*currSpeed);
+  if (currSpeed > 0 ) {
+    if (millis() >= nextStepAt) printByte(GetNextStep());
+  } 
 }
 
 void handleRoot() {
-  server.send(200, "application/json", GerJsonResponse());
-  }
-void HandleHttpData() {
-  String erg = server.uri() + "<br>";
+
   String Cmd = server.arg("CMD");
   String Data = server.arg("DATA");
+  HandleCmd(Cmd, Data);
 
-  if (Cmd=="ProgNext") ProgNext();
-  if (Cmd=="ProgLast") ProgLast();
-  if (Cmd=="DirToggle") DirToggle();
-  if (Cmd=="DirForward") DirForward();
-  if (Cmd=="DirReverse") DirReverse();
-  if (Cmd=="InvertToggle") InvertToggle();
-  if (Cmd=="InvertOn") InvertOn();
-  if (Cmd=="InvertOff") InvertOff();
-  if (Cmd=="SpeedPlus") SpeedPlus();
-  if (Cmd=="SpeedMinus") SpeedMinus();
-  
+  String out = "<b>DLC-4830-V2</b><hr>";
+
+  out += "<table border='0'>";
+
+  out += "<tr><td><b>SPEED</b> (" + String(currSpeed)  +"/" + String(speedDelay)+ ")</td>";
+  out += "<td><a href='?CMD=SpeedPlus'>langsamer</a></td>";
+  out += "<td><a href='?CMD=SpeedMinus'>schneller</a></td>";
+  out += "<td><a href='?CMD=aStep'>ein Schritt</a></td>";
+  out += "</tr>";
+
+  out += "<tr><td><b>PROGRAM</b> (" + String(program) + ")</td>";
+  out += "<td><a href='?CMD=ProgLast'>zurueck</a></td>";
+  out += "<td><a href='?CMD=ProgNext'>vor</a></td>";
+  out += "<td><a href='?CMD=ProgAuto'>Auto ()</a></td>";
+  out += "</tr>";
+
+  out += "<tr><td><b>RICHTUNG</b> (" + String(ReverseActive) + ")</td>";
+  out += "<td><a href='?CMD=DirForward'>nach rechts</a></td>";
+  out += "<td><a href='?CMD=DirReverse'>nach links</a></td>";
+  out += "<td><a href='?CMD=DirToggle'>toggle</a></td>";
+  out += "</tr>";
+
+  out += "<tr><td><b>INVERT</b> (" + String(InvertActive) + ")</td>";
+  out += "<td><a href='?CMD=InvertOff'>normal</a></td>";
+  out += "<td><a href='?CMD=InvertOn'>invert</a></td>";
+  out += "<td><a href='?CMD=InvertToggle'>toggle</a></td>";
+  out += "</tr>";
+
+  out += "</table><br><br><br>";
+
+
+  out += GerJsonResponse();
+  server.send(200, "text/html", out);
+  }
+
+
+
+void HandleHttpData() {
+  String Cmd = server.arg("CMD");
+  String Data = server.arg("DATA");
+  HandleCmd(Cmd, Data);
   server.send(200, "application/json", GerJsonResponse());
   }
+
+  String HandleCmd(String Cmd, String Data) {
+    String erg = server.uri() + "<br>";
+    if (Cmd=="ProgNext") ProgNext();
+    if (Cmd=="ProgLast") ProgLast();
+    if (Cmd=="ProgAuto") ProgAutoToggle();
+    if (Cmd=="DirToggle") DirToggle();
+    if (Cmd=="DirForward") DirForward();
+    if (Cmd=="DirReverse") DirReverse();
+    if (Cmd=="InvertToggle") InvertToggle();
+    if (Cmd=="InvertOn") InvertOn();
+    if (Cmd=="InvertOff") InvertOff();
+    if (Cmd=="SpeedPlus") SpeedPlus();
+    if (Cmd=="SpeedMinus") SpeedMinus();
+    if (Cmd=="aStep") printByte(GetNextStep());
+    return Cmd;
+  }
+
