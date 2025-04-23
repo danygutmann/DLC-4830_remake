@@ -17,9 +17,10 @@ char packetBuffer[255];
 
 int program = 1;
 int currStep = 0;
-int currSpeed = 1;
-int speedDelay = 20;
-unsigned long nextStepAt = millis() + 50; 
+int currSpeed = 5;
+int speedDelay = 160;
+int brightness = 50;
+unsigned long nextStepAt = millis() + 20; 
 byte currOut;
 
 bool ReverseActive = false;
@@ -54,6 +55,7 @@ void setup() {
   Serial.begin(115200);
   nextStep = millis() + delaytime;
   pixels.begin();
+  pixels.setBrightness(brightness);
 
   //WiFi.softAP("DLC-4830", "");
   //IPAddress myIP = WiFi.softAPIP();
@@ -85,6 +87,7 @@ String GerJsonResponse() {
   doc["inv"]["auto"] = InvertCount;
   doc["prog"]["actual"] = program;
   doc["Speed"] = currSpeed;
+  doc["Brightness"] = brightness;
   
   serializeJson(doc, result);
   return result;
@@ -181,23 +184,36 @@ byte flipByte(byte c){
 
 void SpeedSet(int speed){
   currSpeed = speed;
-  if (currSpeed == 1 ) speedDelay = 20;
-  if (currSpeed == 2 ) speedDelay = 40;
-  if (currSpeed == 3 ) speedDelay = 80;
-  if (currSpeed == 4 ) speedDelay = 120;
+  if (currSpeed == 1 ) speedDelay = 500;
+  if (currSpeed == 2 ) speedDelay = 380;
+  if (currSpeed == 3 ) speedDelay = 280;
+  if (currSpeed == 4 ) speedDelay = 200;
   if (currSpeed == 5 ) speedDelay = 160;
-  if (currSpeed == 6 ) speedDelay = 200;
-  if (currSpeed == 7 ) speedDelay = 280;
-  if (currSpeed == 8 ) speedDelay = 380;
-  if (currSpeed == 9 ) speedDelay = 500;
+  if (currSpeed == 6 ) speedDelay = 120;
+  if (currSpeed == 7 ) speedDelay = 80;
+  if (currSpeed == 8 ) speedDelay = 40;
+  if (currSpeed == 9 ) speedDelay = 20;
   }
 void SpeedPlus(){
   SpeedSet(currSpeed +1);
+  if (currSpeed == 10) currSpeed = 9;
   }
 void SpeedMinus(){
   SpeedSet(currSpeed -1);
+  if (currSpeed < 0) currSpeed = 0;
   }
-  
+void BrightnessPlus(){
+  brightness = brightness + 5;
+  if (brightness > 100) brightness = 100;
+  pixels.setBrightness(brightness);
+  pixels.show();
+  }
+void BrightnessMinus(){
+  brightness = brightness - 5;
+  if (brightness < 0) brightness = 0;
+  pixels.setBrightness(brightness);
+  pixels.show();
+  }
 void ProgNext(){
   program++;
   }
@@ -268,8 +284,8 @@ void handleRoot() {
   out += "<table border='0'>";
 
   out += "<tr><td><b>SPEED</b> (" + String(currSpeed)  +"/" + String(speedDelay)+ ")</td>";
-  out += "<td><a href='?CMD=SpeedPlus'>langsamer</a></td>";
-  out += "<td><a href='?CMD=SpeedMinus'>schneller</a></td>";
+  out += "<td><a href='?CMD=SpeedMinus'>langsamer</a></td>";
+  out += "<td><a href='?CMD=SpeedPlus'>schneller</a></td>";
   out += "<td><a href='?CMD=aStep'>ein Schritt</a></td>";
   out += "</tr>";
 
@@ -289,6 +305,11 @@ void handleRoot() {
   out += "<td><a href='?CMD=InvertOff'>normal</a></td>";
   out += "<td><a href='?CMD=InvertOn'>invert</a></td>";
   out += "<td><a href='?CMD=InvertToggle'>toggle</a></td>";
+  out += "</tr>";
+  
+  out += "<tr><td><b>BRIGHTNESS</b> (" + String(brightness) + ")</td>";
+  out += "<td><a href='?CMD=BrightPlus'>heller</a></td>";
+  out += "<td><a href='?CMD=BrightMinus'>dunkler</a></td>";
   out += "</tr>";
 
   out += "</table><br><br><br>";
@@ -320,6 +341,8 @@ void HandleHttpData() {
     if (Cmd=="InvertOff") InvertOff();
     if (Cmd=="SpeedPlus") SpeedPlus();
     if (Cmd=="SpeedMinus") SpeedMinus();
+    if (Cmd=="BrightPlus") BrightnessPlus();
+    if (Cmd=="BrightMinus") BrightnessMinus();
     if (Cmd=="aStep") printByte(GetNextStep());
     return Cmd;
   }
